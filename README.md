@@ -1,75 +1,139 @@
 # Engram
 
-AI coding assistants are stateless. Every session starts from zero — no memory of what you were working on, what you tried, what failed, why you made certain decisions. This is a memory layer that changes that.
+Bio-inspired memory layer for Claude Code. Gives Claude persistent, structured, automatically-retrieved memory that survives across sessions and compactions.
 
-## The idea
+Inspired by the brain's complementary learning systems: hippocampal episodic encoding, cue-based pattern completion, sleep consolidation, and active forgetting.
 
-Human memory has two tiers: episodic (discrete events) and semantic (consolidated knowledge). Episodic memory captures what happened; semantic memory captures what it means. Engram applies the same structure to Claude Code sessions.
-
-It also models salience decay — the biological tendency to forget things you don't use. Memories that get accessed frequently stay alive; memories that go untouched fade. This keeps the context window clean and relevant instead of filling up with stale history.
-
-## How it works
-
-Engram hooks into the Claude Code session lifecycle. It watches every tool call — file reads, edits, shell commands — and encodes each one as a typed episode: what was the goal, what action was taken, what files were involved, did it succeed or fail.
-
-At session end, an LLM reviews the episode log and promotes recurring patterns to a durable semantic store: architectural decisions, conventions, known bug patterns, dependencies. The next session loads this distilled knowledge automatically, before you type anything.
-
-The two tiers live in a local SQLite database. Nothing leaves your machine unless you configure a remote model for consolidation.
+## Architecture
 
 ```
-SessionStart  →  load semantic store + recent episodes → inject as context
-PreToolUse    →  extract cues from tool input → retrieve matching episodes → inject context
-PostToolUse   →  encode tool call as episode → write to SQLite
-SessionEnd    →  LLM consolidation: promote patterns, decay low-value episodes
+SESSION START
+  → SessionStart hook loads semantic store + recent episodes
+  → Injected as context Claude sees immediately
+
+DURING SESSION
+  → PreToolUse hook: before each tool call, searches memory for relevant history
+  → PostToolUse hook: after each tool call, encodes action as structured episode
+  → MCP tools available for explicit memory operations
+
+SESSION END
+  → SessionEnd hook runs consolidation ("sleep"):
+    - Promotes patterns across episodes to semantic memory
+    - Resolves contradictions in existing knowledge
+    - Decays low-value episodes via salience scoring
 ```
 
-## Example
+## Components
 
-Say you spend a session tracking down a bug — a JWT verification failure that only happens when tokens are issued by a third-party provider. You read several files, run some shell commands, hit a dead end, then find the fix: the issuer field wasn't being validated.
-
-Engram records each step as an episode. At session end, consolidation promotes a semantic entry something like:
-
-> **bug_pattern** — JWT verification fails for third-party tokens when `iss` claim is not explicitly validated. Fix: pass `issuer` option to `jwt.verify()`. Affected files: `src/auth/verify.ts`.
-
-Two weeks later, in a new session, you open `src/auth/verify.ts` for an unrelated change. Before you type anything, Engram injects that entry as context. Claude already knows about the issuer bug.
-
-The same mechanism works for decisions ("we use `zod` for all external input validation, not `joi`"), conventions ("database migrations live in `db/migrations/` and must be reversible"), and recurring failures ("this test flakes when the SQLite file is open in another process").
+| Component | File | Purpose |
+|---|---|---|
+| Store | `src/core/store.ts` | SQLite database for episodes + semantic entries |
+| Encoder | `src/core/encoder.ts` | Classifies tool actions into structured episodes |
+| Retrieval | `src/core/retrieval.ts` | Cue-based search and context formatting |
+| Consolidation | `src/core/consolidation.ts` | Between-session pattern promotion and decay |
+| Salience | `src/core/salience.ts` | Active forgetting via salience scoring |
+| MCP Server | `src/mcp/server.ts` | Exposes memory tools for Claude Code + Cursor |
+| Hooks | `src/hooks/` | Claude Code lifecycle integration |
+| CLI | `src/cli.ts` | Manual memory operations |
 
 ## Setup
+
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-Copy the hooks from `hooks.json` into Claude Code settings (Settings → Hooks). The `.mcp.json` file in the project root is auto-detected by Claude Code — no additional configuration needed.
+### 2. Configure for Claude Code
 
-Set an API key for LLM consolidation (optional — without it, episodes are stored but not promoted to semantic memory):
-
-```bash
-export ANTHROPIC_API_KEY=...   # uses claude-haiku-4-5
-# or
-export OPENAI_API_KEY=...      # uses gpt-4o-mini
-```
-
-## CLI
+Copy the hooks configuration into your Claude Code settings:
 
 ```bash
-npx tsx src/cli.ts status             # memory stats
-npx tsx src/cli.ts search <query>     # search episodes and semantic store
-npx tsx src/cli.ts consolidate        # run consolidation manually
-npx tsx src/cli.ts decay              # apply salience decay
-npx tsx src/cli.ts reset --confirm    # clear all memory
+# The hooks.json file contains the configuration to add to your
+# Claude Code settings (Settings > Hooks)
+cat hooks.json
 ```
 
-## MCP tools
+The `.mcp.json` file in the project root is automatically detected by Claude Code.
 
-When configured, Claude has access to four memory tools: `engram_search`, `engram_store`, `engram_status`, `engram_consolidate`.
+### 3. Configure for Cursor
 
-## Configuration
+The `.cursor/mcp.json` file is automatically detected by Cursor. Restart Cursor after setup.
 
-| Variable | Default | Description |
-|---|---|---|
-| `ENGRAM_DB_PATH` | `.engram/memory.db` | Path to SQLite database |
-| `ANTHROPIC_API_KEY` | — | Enables Claude Haiku consolidation |
-| `OPENAI_API_KEY` | — | Alternative: OpenAI consolidation backend |
-| `ENGRAM_SESSION_ID` | — | Session namespace (set automatically by MCP server) |
+### 4. (Optional) Set API key for smart consolidation
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Without an API key, consolidation uses heuristic pattern-matching instead of Claude Haiku.
+
+## CLI Usage
+
+```bash
+# View memory status
+npx tsx src/cli.ts status
+
+# Search memory
+npx tsx src/cli.ts search "auth jwt token"
+
+# Run consolidation manually
+npx tsx src/cli.ts consolidate
+
+# Run salience decay
+npx tsx src/cli.ts decay
+
+# Clear all memory
+npx tsx src/cli.ts reset --confirm
+```
+
+## MCP Tools
+
+When configured, Claude has access to four memory tools:
+
+- **engram_search** — Search past episodes and project knowledge
+- **engram_store** — Explicitly save a decision or observation
+- **engram_status** — View memory statistics
+- **engram_consolidate** — Run consolidation manually
+
+## How It Works
+
+### Episodic Memory (Hippocampus analog)
+Every tool call Claude makes gets encoded as a structured episode: type, goal, action, files, outcome, error, tags. Episodes are discrete, queryable records — not prose summaries.
+
+### Cue-Based Retrieval (CA3 Pattern Completion analog)
+Before each tool call, engram extracts cues (file paths, keywords) and searches the episode store. Matching history is injected into Claude's context automatically. Claude doesn't decide to remember — the system retrieves for it.
+
+### Consolidation (Sleep Replay analog)
+Between sessions, episodes are reviewed for patterns. Repeated patterns get promoted to semantic memory. Contradicted knowledge gets updated. Low-value episodes decay.
+
+### Active Forgetting (GABA-mediated Suppression analog)
+Every entry has a salience score that decays over time and increases on access. Entries below threshold get pruned. Memory stays lean and relevant.
+
+## Example
+
+**Session 1** — you debug a JWT verification failure. Claude reads `src/auth/verify.ts`, tries a fix, it fails, tries another, it works. Three episodes get written:
+
+```
+investigation  goal:"understand JWT failure"  files:[src/auth/verify.ts]  outcome:"iss claim not validated for third-party tokens"
+attempt        goal:"fix JWT verification"    files:[src/auth/verify.ts]  outcome:"failure"  error:"tests still fail, wrong field"
+success        goal:"fix JWT verification"    files:[src/auth/verify.ts]  outcome:"passed issuer option to jwt.verify()"  tags:[auth, jwt, bug]
+```
+
+At session end, consolidation promotes a semantic entry:
+
+```
+bug_pattern — JWT verification silently passes for third-party tokens when `iss` claim is
+not explicitly validated. Fix: pass `issuer` option to `jwt.verify()`. See src/auth/verify.ts.
+```
+
+**Session 2** — two weeks later, you open `src/auth/verify.ts` for an unrelated change. Before Claude reads the file, PreToolUse fires, matches `src/auth/verify.ts` against the episode store, and injects this into Claude's context:
+
+```
+[Engram] Relevant history for src/auth/verify.ts:
+  • bug_pattern: JWT verification silently passes for third-party tokens when `iss` claim
+    is not explicitly validated. Fix: pass `issuer` option to jwt.verify().
+  • success (3 sessions ago): fixed JWT verification — passed issuer option to jwt.verify()
+```
+
+Claude already knows about the bug before you say a word.
