@@ -136,4 +136,4 @@ not explicitly validated. Fix: pass `issuer` option to `jwt.verify()`. See src/a
   • success (3 sessions ago): fixed JWT verification — passed issuer option to jwt.verify()
 ```
 
-Claude already knows about the bug before you say a word.
+Claude knows about the bug as soon as the session starts.
