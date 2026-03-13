@@ -4,10 +4,9 @@
  * Runs consolidation: promotes patterns, resolves contradictions, decays noise.
  * Biological analog: sleep replay and systems consolidation.
  */
-import { resolve } from "node:path";
 import { EngramStore } from "../core/store.js";
 import { Consolidator } from "../core/consolidation.js";
-import { DEFAULT_CONFIG } from "../core/types.js";
+import { loadEngramConfig } from "../core/config.js";
 
 async function main() {
   let event: Record<string, unknown> = {};
@@ -22,13 +21,9 @@ async function main() {
   }
 
   const sessionId = (event.session_id as string) ?? undefined;
-  const dbPath = resolve(process.env.ENGRAM_DB_PATH ?? DEFAULT_CONFIG.dbPath);
-  const store = new EngramStore({ dbPath });
-  const consolidator = new Consolidator(store, {
-    ...DEFAULT_CONFIG,
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-    openaiApiKey: process.env.OPENAI_API_KEY,
-  });
+  const config = loadEngramConfig();
+  const store = new EngramStore(config);
+  const consolidator = new Consolidator(store, config);
 
   try {
     await consolidator.consolidate(sessionId);

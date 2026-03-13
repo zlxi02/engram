@@ -70,7 +70,7 @@ export class Consolidator {
       : "(no existing knowledge)";
 
     const response = await client.messages.create({
-      model: this.config.consolidationModel,
+      model: this.config.anthropicModel,
       max_tokens: 2048,
       messages: [
         {

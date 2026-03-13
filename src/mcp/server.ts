@@ -2,22 +2,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { resolve } from "node:path";
 import {
   EngramStore,
   EpisodeEncoder,
   CueRetrieval,
   Consolidator,
-  DEFAULT_CONFIG,
+  loadEngramConfig,
 } from "../core/index.js";
-import type { EngramConfig, EpisodeType, SemanticCategory } from "../core/types.js";
+import type { EpisodeType, SemanticCategory } from "../core/types.js";
 
-const config: EngramConfig = {
-  ...DEFAULT_CONFIG,
-  dbPath: resolve(process.env.ENGRAM_DB_PATH ?? ".engram/memory.db"),
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-  openaiApiKey: process.env.OPENAI_API_KEY,
-};
+const config = loadEngramConfig();
 
 const store = new EngramStore(config);
 const retrieval = new CueRetrieval(store);

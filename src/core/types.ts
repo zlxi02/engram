@@ -116,7 +116,7 @@ export interface EngramConfig {
   dbPath: string;
   anthropicApiKey?: string;
   openaiApiKey?: string;
-  consolidationModel: string;
+  anthropicModel: string;
   openaiModel: string;
   maxEpisodesPerRetrieval: number;
   maxSemanticsPerRetrieval: number;
@@ -127,7 +127,7 @@ export interface EngramConfig {
 
 export const DEFAULT_CONFIG: EngramConfig = {
   dbPath: ".engram/memory.db",
-  consolidationModel: "claude-haiku-4-5-20241022",
+  anthropicModel: "claude-haiku-4-5-20241022",
   openaiModel: "gpt-4o-mini",
   maxEpisodesPerRetrieval: 8,
   maxSemanticsPerRetrieval: 5,

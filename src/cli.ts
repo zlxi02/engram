@@ -8,22 +8,15 @@
  *   engram decay            Run a salience decay cycle
  *   engram reset            Clear all memory (destructive)
  */
-import { resolve } from "node:path";
 import {
   EngramStore,
   CueRetrieval,
   Consolidator,
   SalienceManager,
-  DEFAULT_CONFIG,
-  type EngramConfig,
+  loadEngramConfig,
 } from "./core/index.js";
 
-const config: EngramConfig = {
-  ...DEFAULT_CONFIG,
-  dbPath: resolve(process.env.ENGRAM_DB_PATH ?? ".engram/memory.db"),
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-  openaiApiKey: process.env.OPENAI_API_KEY,
-};
+const config = loadEngramConfig();
 
 const command = process.argv[2];
 const args = process.argv.slice(3);

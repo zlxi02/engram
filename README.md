@@ -62,11 +62,25 @@ The `.cursor/mcp.json` file is automatically detected by Cursor. Restart Cursor 
 
 ### 4. (Optional) Set API key for smart consolidation
 
+Set one of:
+
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY=sk-ant-...   # uses claude-haiku-4-5-20241022 by default
+export OPENAI_API_KEY=sk-...          # uses gpt-4o-mini by default
 ```
 
-Without an API key, consolidation uses heuristic pattern-matching instead of Claude Haiku.
+Without an API key, consolidation is skipped — episodes still decay, but nothing is promoted to semantic memory.
+
+To use a different model, create `.engram/config.json` in your project:
+
+```json
+{
+  "anthropicModel": "claude-sonnet-4-6",
+  "openaiModel": "gpt-4o"
+}
+```
+
+Any valid Anthropic or OpenAI model ID works. API keys stay in environment variables.
 
 ## CLI Usage
 
